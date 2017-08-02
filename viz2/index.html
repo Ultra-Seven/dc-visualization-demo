@@ -1,0 +1,204 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+    <title>DC.js + Leaflet</title>
+
+    <meta itemprop="name" content="DC.js + Leaflet"/>
+    <meta itemprop="description" content="DC.js + Leaflet chart"/>
+
+    <meta charset="UTF-8">
+
+    <link type="text/css" href="../lib/leaflet.css" rel="stylesheet"/>
+    <link type="text/css" href="../lib/leaflet.markercluster.css" rel="stylesheet"/>
+    <link type="text/css" href="../lib/dc.css" rel="stylesheet"/>
+
+    <style>
+        #holder {
+            width:1500px;
+            margin:20px auto;
+        }
+        #holder>div {
+            padding:30px 0;
+            clear:both;
+        }
+        .map {
+            width:600px;
+            height:400px;
+        }
+        .pie {
+            margin-left:30px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="holder">
+    <h2>Marker Chart</h2>
+    <i>us real population & GDP by metropolitan area</i>
+    <div id = "demo">
+        <div class="map"></div>
+        <div class="barChart">
+            <i>X: Zone & Y: Population</i>
+        </div>
+        <div class="pie"><i>Male & Female</i></div>
+
+    </div>
+    <div id = "lineChart">
+        <div class="lineChart"><i>gdp increasing by time</i></div>
+        <button class="btn" onclick="button1()">city 1</button>
+        <button class="btn" onclick="button2()">city 2</button>
+        <button class="btn" onclick="button3()">city 3</button>
+
+    </div>
+</div>
+<script type="text/javascript" src="../lib/d3.js"></script>
+<script type="text/javascript" src="../lib/crossfilter.js"></script>
+<script type="text/javascript" src="../lib/dc.js"></script>
+<script type="text/javascript" src="../lib/leaflet.js"></script>
+
+<!--Optional-->
+<script type="text/javascript" src="../lib/leaflet.markercluster.js"></script>
+
+<script type="text/javascript" src="../dc.leaflet.js"></script>
+<script type="text/javascript">
+    var lineChart = dc.lineChart("#lineChart .lineChart");
+    var speedSumGroup1, speedSumGroup2, speedSumGroup3, runDimension;
+    d3.tsv("../data/demo1.tsv", function(data) {
+        drawMarkerSelect(data);
+    });
+    d3.csv("../data/morley.csv", function(error, experiments) {
+        experiments.forEach(function(x) {
+            x.Speed = +x.Speed;
+        });
+        var ndx = crossfilter(experiments);
+//        var all = ndx.groupAll();
+        runDimension = ndx.dimension(function(d) {return +d.Run;});
+        speedSumGroup1 = runDimension.group().reduceSum(function(d) {
+            if (+d.Expt === 1)
+                return d.Speed;
+            else return 0;
+        });
+        speedSumGroup2 = runDimension.group().reduceSum(function(d) {
+            if (+d.Expt === 2)
+                return d.Speed;
+            else return 0;
+        });
+        speedSumGroup3 = runDimension.group().reduceSum(function(d) {
+            if (+d.Expt === 3)
+                return d.Speed;
+            else return 0;
+        });
+        drawLine(speedSumGroup1);
+    });
+
+    function drawMarkerSelect(data) {
+        var xf = crossfilter(data);
+        var groupname = "marker-select";
+        var facilities = xf.dimension(function(d) { return d.geo; });
+        var facilitiesGroup = facilities.group().reduceCount();
+
+        let chart = dc.leafletMarkerChart("#demo .map",groupname);
+        chart.dimension(facilities)
+            .group(facilitiesGroup)
+            .width(600)
+            .height(400)
+            .center([42.69,25.42])
+            .zoom(7)
+            .cluster(true);
+
+        var types = xf.dimension(function(d) { return d.type; });
+        var typesGroup = types.group().reduceCount();
+        let barChart = dc.barChart("#demo .barChart",groupname);
+        barChart.width(400) // (optional) define chart width, :default = 200
+            .height(400) // (optional) define chart height, :default = 200
+//            .transitionDuration(500) // (optional) define chart transition duration, :default = 500
+            // (optional) define margins
+//            .margins({top: 10, right: 50, bottom: 30, left: 40})
+            .dimension(types)
+            .group(typesGroup) // set group
+            // (optional) whether chart should rescale y axis to fit data, :default = false
+            .elasticY(true)
+            // (optional) when elasticY is on whether padding should be applied to y axis domain, :default=0
+//            .yAxisPadding(100)
+            // (optional) whether chart should rescale x axis to fit data, :default = false
+            .elasticX(true)
+            // (optional) when elasticX is on whether padding should be applied to x axis domain, :default=0
+            .xAxisPadding(100)
+            // define x scale
+            .x(d3.scale.ordinal())
+            // (optional) set filter brush rounding
+//            .round(d3.time.month.round)
+            // define x axis units
+            .xUnits(dc.units.ordinal)
+            // (optional) whether bar should be center to its x value, :default=false
+//            .centerBar(true)
+            // (optional) set gap between bars manually in px, :default=2
+            .gap(1)
+            // (optional) render horizontal grid lines, :default=false
+//            .renderHorizontalGridLines(true)
+            // (optional) render vertical grid lines, :default=false
+//            .renderVerticalGridLines(true)
+            // (optional) add stacked group and custom value retriever
+//            .stack(monthlyMoveGroup, function(d){return d.value;})
+            // (optional) you can add multiple stacked group with or without custom value retriever
+            // if no custom retriever provided base chart's value retriever will be used
+//            .stack(monthlyMoveGroup)
+            // (optional) whether this chart should generate user interactive brush to allow range
+            // selection, :default=true.
+            .brushOn(false)
+            .xAxisLabel('Energy')
+            .yAxisLabel('Zone');
+            // (optional) whether svg title element(tooltip) should be generated for each bar using
+            // the given function, :default=no
+//            .title(function(d) { return "Value: " + d.value; })
+            // (optional) whether chart should render titles, :default = false
+//            .renderTitle(true);
+
+        dc.pieChart("#demo .pie",groupname)
+            .dimension(types)
+            .group(typesGroup)
+            .width(200)
+            .height(200)
+            .renderLabel(true)
+            .renderTitle(true)
+            .ordering(function (p) {
+                return -p.value;
+            });
+
+        dc.renderAll(groupname);
+    }
+    function button1() {
+        drawLine(speedSumGroup1);
+    }
+    function button2() {
+        drawLine(speedSumGroup2);
+    }
+    function button3() {
+        drawLine(speedSumGroup3);
+    }
+    function drawLine(group) {
+        lineChart
+            .width(768)
+            .height(480)
+            .x(d3.scale.linear().domain([0,20]))
+            .interpolate('cardinal')
+            //            .renderArea(true)
+            .brushOn(false)
+            .clipPadding(10)
+            .yAxisLabel("This is the Y Axis! Speed")
+            .xAxisLabel("This is the X Axis! Run")
+            .dimension(runDimension)
+            .group(group);
+
+        lineChart.render();
+    }
+    function load_Data(file) {
+        d3.csv(file, function(error, experiments) {
+            ndx.remove();
+            ndx.add(experiments);
+            dc.redrawAll();
+        });
+    }
+</script>
+</body>
+</html>
