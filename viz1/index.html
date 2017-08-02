@@ -1,0 +1,130 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+    <title>DC.js + Leaflet</title>
+
+    <meta itemprop="name" content="DC.js + Leaflet"/>
+    <meta itemprop="description" content="DC.js + Leaflet chart"/>
+
+    <meta charset="UTF-8">
+
+    <link type="text/css" href="../lib/leaflet.css" rel="stylesheet"/>
+    <link type="text/css" href="../lib/leaflet.markercluster.css" rel="stylesheet"/>
+    <link type="text/css" href="../lib/dc.css" rel="stylesheet"/>
+
+    <style>
+        #holder {
+            width:850px;
+            margin:20px auto;
+        }
+        #holder>div {
+            padding:30px 0;
+            clear:both;
+        }
+        .map {
+            width:600px;
+            height:400px;
+        }
+        .pie {
+            margin-left:30px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="holder">
+    <div id="demo">
+        <h2>Choropleth Chart</h2>
+        <i>Population by age groups in Bulgaria in 2011 (excluding the capital)</i>
+        <div class="map"></div>
+        <!--<div class="pie"></div>-->
+    </div>
+</div>
+<script type="text/javascript" src="../lib/d3.js"></script>
+<script type="text/javascript" src="../lib/crossfilter.js"></script>
+<script type="text/javascript" src="../lib/dc.js"></script>
+<script type="text/javascript" src="../lib/leaflet.js"></script>
+
+<!--Optional-->
+<script type="text/javascript" src="../lib/leaflet.markercluster.js"></script>
+
+<script type="text/javascript" src="../dc.leaflet.js"></script>
+<script type="text/javascript">
+    var isGeojsonReady = false;
+    var isDataReady = false;
+    d3.json("../data/bulgaria.geojson", function(data) {
+        let demo2_geojson = data;
+        d3.csv("../data/demo2.csv", function(data) {
+            let chooroplethData = data;
+            drawChoropleth(chooroplethData, demo2_geojson);
+        });
+    });
+    function drawChoropleth(data, geojson) {
+        let dataP = [];
+        data.filter(element => {
+            return element.code && element.code!=='SOF46';
+        }).forEach(element => {
+            element.sum = 0;
+            for(let population in element) {
+                if (population && population !== "code" && population !== "sum") {
+                    const num = parseInt(element[population]);
+                    dataP.push({
+                        'code':element.code,
+                        'type':population,
+                        'value': num
+                    });
+                    element.sum += num;
+                }
+            }
+        });
+        delete data;
+        const xf = crossfilter(dataP);
+        const groupname = "Choropleth";
+        const facilities = xf.dimension(function (d) {
+            return d.code;
+        });
+        const facilitiesGroup = facilities.group().reduceSum(function (d) {
+            return d.value;
+        });
+
+        let chart = dc.leafletChoroplethChart("#demo .map",groupname);
+
+        chart.on('click', function(ev) {
+            alert(ev.latlng); // ev is an event object (MouseEvent in this case)
+        });
+
+        chart.dimension(facilities)
+            .group(facilitiesGroup)
+            .width(600)
+            .height(400)
+            .center([42.69,25.42])
+            .zoom(7)
+            .geojson(geojson)
+            .colors(['#fff7f3', '#fde0dd', '#fcc5c0', '#fa9fb5', '#f768a1', '#dd3497', '#ae017e', '#7a0177', '#49006a'])
+            .colorDomain(function () {
+                return [dc.utils.groupMin(this.group(), this.valueAccessor()),
+                    dc.utils.groupMax(this.group(), this.valueAccessor())];
+            })
+            .colorAccessor(function(d,i) {
+//                console.log(d, i);
+                return d.value;
+            })
+            .featureKeyAccessor(function(feature) {
+//                console.log(feature);
+                return feature.properties.code;
+            })
+            .renderPopup(true)
+            .popup(function(d,feature) {
+                return feature.properties.nameEn+" : "+d.value;
+            });
+        dc.renderAll(groupname);
+        var leaflet_map = chart.map();
+        leaflet_map.on("zoomend", onZoomLevelsChange)
+    }
+    // we could do some query staff in this function!
+    function onZoomLevelsChange(e) {
+        alert("zoom levels changed!");
+    }
+</script>
+</body>
+</html>
