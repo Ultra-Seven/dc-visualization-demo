@@ -1,0 +1,179 @@
+<html>
+<head>
+    <title>How to make a choropleth map with Leaflet.js</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="../lib/leaflet.css" />
+    <link type="text/css" href="../lib/dc.css" rel="stylesheet"/>
+    <script src="../lib/leaflet.js"></script>
+    <script type="text/javascript" src="../lib/d3.js"></script>
+    <script type="text/javascript" src="../lib/crossfilter.js"></script>
+    <script type="text/javascript" src="../lib/dc.js"></script>
+    <script src="../data/us-states.js"></script>
+    <!--<script src="censustracts.js"></script>-->
+    <style type="text/css">
+        #map{
+            height: 100%;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            border:3px solid rgba(0, 0, 0, 0.16)
+        }
+        #viz_title {
+            display: -webkit-flex;
+            -webkit-justify-content: center;
+            -webkit-align-items: center;
+            font-family:Arial, Helvetica, sans-serif;
+            font-size:30px;
+            font-weight:bold;
+            color: #000000;
+            line-height:35px;
+        }
+        #viz1 {
+            float: left;
+            height: 44%;
+            width: 43%;
+            margin-left: 5%;
+        }
+
+        #viz2 {
+            float: right;
+            height: 92%;
+            width: 43%;
+            margin-right: 5%;
+        }
+
+        #viz3 {
+            float: left;
+            height: 44%;
+            width: 43%;
+            margin-top: 2%;
+            margin-left: 5%;
+        }
+
+        #rowChart{
+              height: 100%;
+              width: 100%;
+              padding: 0;
+              margin: 0;
+              border:3px solid rgba(0, 0, 0, 0.16)
+        }
+        #lineChart{
+            height: 100%;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            border:3px solid rgba(0, 0, 0, 0.16)
+        }
+
+        .title {
+            font-family:Arial, sans-serif;
+            font-size:15px;
+            color: #909090;
+        }
+
+    </style>
+
+</head>
+<body>
+    <div id="viz_title">Multi-view Dashboard</div>
+    <div id = "viz1">
+        <div class="title">Map</div>
+        <div id = "map"></div>
+    </div>
+
+    <div id = "viz2">
+        <div class="title">Bar Chart</div>
+        <div id = "rowChart"></div>
+    </div>
+
+    <div id = "viz3">
+        <div class="title">Trend</div>
+        <div id = "lineChart"></div>
+    </div>
+
+    <script type="text/javascript">
+
+        var map = L.map('map').setView([37.8, -96], 4);
+
+        L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {attribution: 'OSM'})
+            .addTo(map);
+
+        function getColor(d) {
+            return d > 1000 ? '#800026' :
+                d > 500  ? '#BD0026' :
+                    d > 200  ? '#E31A1C' :
+                        d > 100  ? '#FC4E2A' :
+                            d > 50   ? '#FD8D3C' :
+                                d > 20   ? '#FEB24C' :
+                                    d > 10   ? '#FED976' :
+                                        '#FFEDA0';
+        }
+
+        function style(feature) {
+            return {
+                fillColor: getColor(feature.properties.density),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.7
+            };
+        }
+
+        L.geoJson(statesData, {style: style}).addTo(map);
+
+    </script>
+
+    <script type="text/javascript">
+        var rowChart = dc.rowChart("#viz2 #rowChart");
+        d3.csv("../data/morley.csv", function(error, experiments) {
+            experiments.forEach(function(x) {
+                x.Speed = +x.Speed;
+            });
+            let ndx                 = crossfilter(experiments),
+                runDimension        = ndx.dimension(function(d) {return +d.Run;}),
+                speedSumGroup       = runDimension.group().reduceSum(function(d) {return d.Speed * d.Run / 1000;});
+            rowChart
+                .width(700)
+                .height(480)
+                .x(d3.scale.linear().domain([6,20]))
+//                .y(d3.scale.linear().domain([6,20]))
+//                .elasticY(true)
+                .elasticX(true)
+                .dimension(runDimension)
+                .group(speedSumGroup)
+                .render();
+        });
+
+    </script>
+
+    <script type="text/javascript">
+        var lineChart = dc.lineChart("#viz3 #lineChart");
+        var speedSumGroup1, speedSumGroup2, speedSumGroup3, runDimension;
+        d3.csv("../data/morley.csv", function(error, experiments) {
+            experiments.forEach(function(x) {
+                x.Speed = +x.Speed;
+            });
+            let ndx                 = crossfilter(experiments),
+                runDimension        = ndx.dimension(function(d) {return +d.Run;}),
+                speedSumGroup       = runDimension.group().reduceSum(function(d) {return d.Speed * d.Run / 1000;});
+            lineChart
+                .width(768)
+                .height(380)
+                .x(d3.scale.linear().domain([0,20]))
+                .interpolate('cardinal')
+                //            .renderArea(true)
+                .brushOn(false)
+                .clipPadding(10)
+                .margins({top: 10, right: 50, bottom: 40, left: 60})
+                .yAxisLabel("This is the Y Axis! Speed")
+                .xAxisLabel("This is the X Axis! Run")
+                .dimension(runDimension)
+                .group(speedSumGroup)
+                .render();
+
+        });
+    </script>
+
+</body>
+</html>
